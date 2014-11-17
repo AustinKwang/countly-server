@@ -230,8 +230,7 @@ app.get('/dashboard', function (req, res, next) {
                             admin_apps:countlyGlobalAdminApps,
                             csrf_token:req.session._csrf,
                             member:member,
-                            languages: langs.languages,
-                            'locale-distributions': {"544a19d9a72f180000000001": {default: 0.4, ru: 0.2, en: 0.1, tr: 0.1, zh_hant: 0.1}}
+                            languages: langs.languages
                         }, 'countlyGlobal');
 
                         if (settings && !err) {

@@ -67,7 +67,8 @@
                         "method" : "events",
                         "action" : "refresh",
                         "event": key,
-                        "segmentation": "no-segment"
+                        "segmentation": "no-segment",
+                        "period":_period
                     },
                     dataType: "jsonp",
                     success: function(json) {

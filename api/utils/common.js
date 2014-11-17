@@ -142,7 +142,8 @@ var common = {},
             property == common.dbMap["unique"] ||
             property.substr(0,2) == (common.dbMap["frequency"] + ".") ||
             property.substr(0,2) == (common.dbMap["loyalty"] + ".") ||
-            property.substr(0,3) == (common.dbMap["durations"] + "."))
+            property.substr(0,3) == (common.dbMap["durations"] + ".") ||
+            property == common.dbMap["messaging-enabled"])
         {
             object[timeObj.yearly + ".w" + timeObj.weekly + '.' + property] = increment;
         }
