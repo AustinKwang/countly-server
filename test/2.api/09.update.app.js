@@ -15,11 +15,11 @@ describe('Updating app', function(){
 			APP_ID = testUtils.get("APP_ID");
 			request
 			.get('/i/apps/update?api_key='+API_KEY_ADMIN)
-			.expect(400)
+			.expect(200)
 			.end(function(err, res){
 				if (err) return done(err);
 				var ob = JSON.parse(res.text);
-				ob.should.have.property('result', 'Not enough args');
+				ob.should.have.property('error', 'Invalid arguments provided');
 				done()
 			});
 		});
