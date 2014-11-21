@@ -362,7 +362,7 @@ var pushly 			= require('pushly')(),
 
         common.db.collection('apps').find({_id: {$in: msg.apps}}).toArray(function(err, apps){
             if (err || !apps || !apps.length) {
-                callback.counters(null, []);
+                callback(null, []);
             } else {
                 var message = new Message(msg.apps, '')
                         .setId(new common.db.ObjectID())
