@@ -184,6 +184,15 @@ $.extend(Template.prototype, {
         });
     };
 
+    CountlyHelpers.loading = function (msg) {
+        var dialog = $("#cly-loading").clone();
+        dialog.removeAttr("id");
+        dialog.find(".message").html(msg);
+        dialog.addClass('cly-loading');
+        revealDialog(dialog);
+        return dialog;
+    };
+
 	CountlyHelpers.refreshTable = function(dTable, newDataArr) {
         var oSettings = dTable.fnSettings();
         dTable.fnClearTable(false);
@@ -223,6 +232,46 @@ $.extend(Template.prototype, {
 			}
 		});
 	};
+
+    CountlyHelpers.appIdsToNames = function(context){
+        var ret = "";
+
+        for (var i = 0; i < context.length; i++) {
+            if (!context[i]) {
+                continue;
+            } else if (!countlyGlobal['apps'][context[i]]) {
+                ret += 'deleted app';
+            } else {
+                ret += countlyGlobal['apps'][context[i]]["name"];
+            }
+
+            if (context.length > 1 && i != context.length - 1) {
+                ret += ", ";
+            }
+        }
+
+        return ret;
+    };
+
+    CountlyHelpers.messageText = function(messagePerLocale) {
+        if (!messagePerLocale) {
+            return '';
+        } else if (messagePerLocale['default']) {
+            return messagePerLocale['default'];
+        } else if (messagePerLocale.en) {
+            return messagePerLocale.en;
+        } else {
+            for (var locale in messagePerLocale) return messagePerLocale[locale];
+        }
+        return '';
+    };
+
+    CountlyHelpers.clip = function(f) {
+        return function(opt) {
+            var res = f(opt);
+            return '<div class="clip">' + res + '</div>';
+        }
+    };
 
 	CountlyHelpers.reopenRows = function(dTable, getData){
 		var nTr;
@@ -358,8 +407,11 @@ $.extend(Template.prototype, {
 
     $(document).ready(function () {
         $("#overlay").click(function () {
-            $(".dialog:visible").fadeOut().remove();
-            $(this).hide();
+            var dialog = $(".dialog:visible:not(.cly-loading)");
+            if (dialog.length) {
+                dialog.fadeOut().remove();
+                $(this).hide();
+            }
         });
 
         $("#dialog-ok, #dialog-cancel, #dialog-continue").live('click', function () {
@@ -1805,11 +1857,6 @@ window.LanguageView = countlyView.extend({
                 "left":jQuery.i18n.map["common.total-users"],
                 "right":jQuery.i18n.map["common.new-users"]
             },
-            "chart-data":{
-                "columnCount":4,
-                "columns":[jQuery.i18n.map["languages.table.language"], jQuery.i18n.map["common.table.total-sessions"], jQuery.i18n.map["common.table.total-users"], jQuery.i18n.map["common.table.new-users"]],
-                "rows":[]
-            },
             "chart-helper":"languages.chart",
             "table-helper":""
         };
@@ -1818,20 +1865,23 @@ window.LanguageView = countlyView.extend({
             if (row.language in countlyGlobal.languages) row.language = countlyGlobal.languages[row.language].englishName;
         });
 
-        this.templateData["chart-data"]["rows"] = languageData.chartData;
-
         if (!isRefresh) {
             $(this.el).html(this.template(this.templateData));
 
-            $(".sortable").stickyTableHeaders();
-
-            var self = this;
-            $(".sortable").tablesorter({sortList:this.sortList}).bind("sortEnd", function (sorter) {
-                self.sortList = sorter.target.config.sortList;
-            });
-
             countlyCommon.drawGraph(languageData.chartDPTotal, "#dashboard-graph", "pie");
             countlyCommon.drawGraph(languageData.chartDPNew, "#dashboard-graph2", "pie");
+
+            this.dtable = $('.d-table').dataTable($.extend({}, $.fn.dataTable.defaults, {
+                "aaData": languageData.chartData,
+                "aoColumns": [
+                    { "mData": "language", "sTitle": jQuery.i18n.map["languages.table.language"] },
+                    { "mData": "t", sType:"formatted-num", "mRender":function(d) { return countlyCommon.formatNumber(d); }, "sTitle": jQuery.i18n.map["common.table.total-sessions"] },
+                    { "mData": "u", sType:"formatted-num", "mRender":function(d) { return countlyCommon.formatNumber(d); }, "sTitle": jQuery.i18n.map["common.table.total-users"] },
+                    { "mData": "n", sType:"formatted-num", "mRender":function(d) { return countlyCommon.formatNumber(d); }, "sTitle": jQuery.i18n.map["common.table.new-users"] }
+                ]
+            }));
+
+            $(".d-table").stickyTableHeaders();
         }
     },
     refresh:function () {
@@ -1850,7 +1900,8 @@ window.LanguageView = countlyView.extend({
             countlyCommon.drawGraph(languageData.chartDPTotal, "#dashboard-graph", "pie");
             countlyCommon.drawGraph(languageData.chartDPNew, "#dashboard-graph2", "pie");
 
-            $(".sortable").trigger("update");
+            CountlyHelpers.refreshTable(self.dtable, languageData.chartData);
+
             app.localize();
         });
     }
@@ -2341,6 +2392,7 @@ window.ManageAppsView = countlyView.extend({
             }
 
             $(this).addClass("disabled");
+            var loading = CountlyHelpers.loading(jQuery.i18n.map["management-applications.checking"]);
 
             var updatedApp = $(".app-container").filter(function () {
                     return $(this).data("id") && $(this).data("id") == appId;
@@ -2349,11 +2401,16 @@ window.ManageAppsView = countlyView.extend({
                 reactivateForm = function() {
                     forms--;
                     if (forms == 0) {
+                        loading.remove();
                         $("#save-app-edit").removeClass("disabled");
                         initAppManagement(appId);
                         hideEdit();
                         updatedApp.find(".name").text(appName);
                     }
+                },
+                showError = function(msg){
+                    loading.remove();
+                    CountlyHelpers.alert(msg, "red");
                 };
 
             $.ajax({
@@ -2375,7 +2432,7 @@ window.ManageAppsView = countlyView.extend({
                 dataType:"jsonp",
                 success:function (data) {
                     if (data.error) {
-                        CountlyHelpers.alert(jQuery.i18n.map["management-applications.gcm-creds-error"], "red");
+                        showError(jQuery.i18n.map["management-applications.gcm-creds-error"]);
                         forms = 1;
                         reactivateForm();
                         return;
@@ -2416,7 +2473,7 @@ window.ManageAppsView = countlyView.extend({
                             },
                             success:function (file) {
                                 if (!file) {
-                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.icon-error"], "red");
+                                    showError(jQuery.i18n.map["management-applications.icon-error"]);
                                 } else {
                                     updatedApp.find(".logo").css({
                                         "background-image":"url(" + file + "?v" + (new Date().getTime()) + ")"
@@ -2440,7 +2497,7 @@ window.ManageAppsView = countlyView.extend({
                             },
                             success:function (resp) {
                                 if (!resp || resp.error) {
-                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-apn-creds-test-error"], "red");
+                                    showError(jQuery.i18n.map["management-applications.push-apn-creds-test-error"]);
                                 } else {
                                     if (!countlyGlobal['apps'][appId].apn) {
                                         countlyGlobal['apps'][appId].apn = {test: resp};
@@ -2464,7 +2521,7 @@ window.ManageAppsView = countlyView.extend({
                             },
                             success:function (resp) {
                                 if (!resp || resp.error) {
-                                    CountlyHelpers.alert(jQuery.i18n.map["management-applications.push-apn-creds-prod-error"], "red");
+                                    showError(jQuery.i18n.map["management-applications.push-apn-creds-prod-error"]);
                                 } else {
                                     if (!countlyGlobal['apps'][appId].apn) {
                                         countlyGlobal['apps'][appId].apn = {prod: resp};
@@ -3171,6 +3228,7 @@ window.MessagingDashboardView = countlyView.extend({
         }
     },
     refresh:function () {
+        $.when(this.beforeRender()).then(this.renderCommon.bind(this, true));
     }
 });
 
@@ -3182,23 +3240,72 @@ window.MessagingListView = countlyView.extend({
     initialize:function () {
         this.template = Handlebars.compile($("#template-messaging-list").html());
     },
-    renderCommon:function (isRefresh) {
+    renderTable:function (isRefresh) {
         var pushes = countlyPush.getAllMessages();
-        $('#content').html(this.template({
-            'logo-class': 'logo',
-            'page-title': 'Messages',
-            pushes:pushes,
-            apps:countlyGlobal['apps']
+
+        $.fn.dataTableExt.oStdClasses.sWrapper = "dataTableOne_wrapper message-list";
+        this.dtable = $('.d-table').dataTable($.extend({}, $.fn.dataTable.defaults, {
+            "aaData": pushes,
+            "aoColumns": [
+                { "mData": "messagePerLocale", "mRender": CountlyHelpers.clip(CountlyHelpers.messageText), "sTitle": jQuery.i18n.map["push.table.message"] },
+                { "mData": "apps", sType:"string", "mRender": CountlyHelpers.clip(CountlyHelpers.appIdsToNames), "sTitle": jQuery.i18n.map["push.table.app-names"] },
+                { "mData": "percentDelivered", sType:"string", "mRender": function(d, type, data){
+                    return '<div class="bar" data-desc="' + d + '%">' +
+                                '<div class="bar-inner" style="width:' + d + '%;" data-item="' + d + '%"></div>' +
+                                '<div class="bar-inner" style="width:' + data.percentNotDelivered + '%;" data-item="' + data.percentNotDelivered + '%"></div> ' +
+                            '</div>' +
+                            '<div class="percent-text">' + jQuery.i18n.prop('push.count.sent', d) + '%</div>';
+                }, "sTitle": jQuery.i18n.map["push.table.delivered"] },
+                { "mData": "result", sType:"string", "mRender":function(d) { return '<span data-localize="push.message.status.' + d.status + '"></span>'; }, "sTitle": jQuery.i18n.map["push.table.status"] },
+                { "mData": "local.created", sType:"date", "sTitle": jQuery.i18n.map["push.table.created"] },
+                { "mData": "local", sType:"string", "sTitle": jQuery.i18n.map["push.table.sent-scheduled"], mRender: function(local){
+                    return local.sent ? local.sent : local.date;
+                } }
+            ],
+            "aaSorting": [[4, 'desc']],
+            "fnCreatedRow": function(row, data, i) {
+                $(row).attr('data-mid', data._id);
+                $(row).find('.percent-text').text(jQuery.i18n.prop('push.count.sent', data.percentDelivered, data.result.sent));
+            }
         }));
 
+        $.fn.dataTableExt.oStdClasses.sWrapper = "dataTableOne_wrapper";
+
+        // $('.d-table').dataTable().api().rows().each(function(row, i){
+        //     $(row.node()).attr('data-mid', row.data()._id);
+        // });
+
+        // $('.d-table').find('tr').each(function(i, tr){
+        //     if (i > 0) $(tr).attr('data-mid', pushes[i - 1]._id);
+        // });
+
+        $(".d-table").stickyTableHeaders();
+
         $('.btn-create-message').off('click').on('click', PushPopup.bind(window, undefined, undefined));
-        $('#push-table tr:not(.push-no-messages)').off('click').on('click', function(){
+        $('.d-table tr:not(.push-no-messages)').off('click').on('click', function(){
             var mid = $(this).attr('data-mid');
             for (var i in pushes) if (pushes[i]._id === mid) {
                 PushPopup(pushes[i]);
                 return;
             }
         });
+    },
+    renderCommon:function (isRefresh) {
+        if (!isRefresh) {
+            $('#content').html(this.template({
+                'logo-class': 'logo',
+                'page-title': 'Messages'
+            }));
+        }
+
+        this.renderTable();
+
+        if (isRefresh) {
+            app.localize();
+        }
+    },
+    refresh: function(){
+        $.when(this.beforeRender()).then(this.renderCommon.bind(this, true));
     }
 });
 
@@ -3603,7 +3710,7 @@ var PushPopup = function(message, duplicate) {
         function fillLocales() {
             ul.empty();
             if ('default' in message.usedLocales) {
-                ul.append(li(Math.round(100 * message.usedLocales.default), 'default', jQuery.i18n.map["push.locale.default"]).addClass('selected'));
+                ul.append(li(Math.round(100 * message.usedLocales['default']), 'default', jQuery.i18n.map["push.locale.default"]).addClass('selected'));
             }
             for (var locale in message.usedLocales) if (locale !== 'default') {
                 ul.append(li(Math.round(100 * message.usedLocales[locale]), locale, (languages[locale] || '').englishName));
@@ -3755,7 +3862,10 @@ var PushPopup = function(message, duplicate) {
             if (message.data && (!json.data || !toJSON(json.data))) {
                 content.find(".extra-data").after(req.clone());
             }
-            if ('default' in message.usedLocales && !json.messagePerLocale.default) {
+            if (json.type === 'link' && (!json.url || ! /^([a-z]([a-z]|\d|\+|-|\.)*):(\/\/(((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?((\[(|(v[\da-f]{1,}\.(([a-z]|\d|-|\.|_|~)|[!\$&'\(\)\*\+,;=]|:)+))\])|((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=])*)(:\d*)?)(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*|(\/((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)){0})(\?((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|[\uE000-\uF8FF]|\/|\?)*)?(\#((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|\/|\?)*)?$/i.test(json.url) )) {
+                content.find(".field.link .details").after(req.clone());
+            }
+            if ('default' in message.usedLocales && !json.messagePerLocale['default']) {
                 content.find(".locales li").first().append(req.clone());
             }
 
@@ -3816,10 +3926,10 @@ var PushPopup = function(message, duplicate) {
                 if (message.messagePerLocale[l] && l !== 'default') all += message.usedLocales[l];
             }
 
-            if (message.messagePerLocale.default) {
-                message.usedLocales.default = message.count.TOTALLY - all;
+            if (message.messagePerLocale['default']) {
+                message.usedLocales['default'] = message.count.TOTALLY - all;
             } else if (all < message.count.TOTALLY) {
-                message.usedLocales.default = message.count.TOTALLY - all;
+                message.usedLocales['default'] = message.count.TOTALLY - all;
             }
 
             if (message.count.TOTALLY) {
@@ -3831,7 +3941,7 @@ var PushPopup = function(message, duplicate) {
                 txt.hide();
             }
 
-            if (!message.count.TOTALLY || ('default' in message.usedLocales && !message.messagePerLocale.default)) {
+            if (!message.count.TOTALLY || ('default' in message.usedLocales && !message.messagePerLocale['default'])) {
                 send.addClass('disabled');
             } else {
                 send.removeClass('disabled');
@@ -3985,6 +4095,7 @@ var PushPopup = function(message, duplicate) {
             data:  message.data  ? content.find('.extra-data').val()  : '',
             update: message.type === 'update',
             review: message.type === 'review',
+            url: message.type === 'link' ? content.find('.push-link').val() : '',
             locales: message.usedLocales,
             date: content.find('.send-later:checked').length ? content.find('.send-later-date').data('timestamp') : null
         };
@@ -3992,6 +4103,7 @@ var PushPopup = function(message, duplicate) {
         if (json.sound === '') delete json.sound;
         if (json.badge === '') delete json.badge;
         if (json.data  === '') delete json.data;
+        if (json.url  === '') delete json.url;
         if (!json.update) delete json.update;
         if (!json.review) delete json.review;
 
@@ -4386,23 +4498,7 @@ var AppRouter = Backbone.Router.extend({
             return context.toUpperCase();
         });
         Handlebars.registerHelper('appIdsToNames', function (context, options) {
-            var ret = "";
-
-            for (var i = 0; i < context.length; i++) {
-                if (!context[i]) {
-                    continue;
-                } else if (!countlyGlobal['apps'][context[i]]) {
-                    ret += 'deleted app';
-                } else {
-                    ret += countlyGlobal['apps'][context[i]]["name"];
-                }
-
-                if (context.length > 1 && i != context.length - 1) {
-                    ret += ", ";
-                }
-            }
-
-            return ret;
+            return CountlyHelpers.appIdsToNames(context);
         });
         Handlebars.registerHelper('forNumberOfTimes', function (context, options) {
             var ret = "";
@@ -4419,16 +4515,7 @@ var AppRouter = Backbone.Router.extend({
 
         Handlebars.registerPartial("message", $("#template-message-partial").html());
         Handlebars.registerHelper('messageText', function (context, options) {
-            if (!context.messagePerLocale) {
-                return '';
-            } else if (context.messagePerLocale.default) {
-                return context.messagePerLocale.default;
-            } else if (context.messagePerLocale.en) {
-                return context.messagePerLocale.en;
-            } else {
-                for (var locale in context.messagePerLocale) return context.messagePerLocale[locale];
-            }
-            return "";
+            return CountlyHelpers.messageText(context.messagePerLocale);
         });
 
         Handlebars.registerHelper('ifMessageStatusToRetry', function (status, options) {

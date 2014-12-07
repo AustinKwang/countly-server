@@ -189,13 +189,17 @@ var pushly 			= require('pushly')(),
                     m.result.status		|= push.result.status;
                 }
 
-                if ((m.result.status & MessageStatus.Sent) > 0) {
-                    m.sent = new Date();
-                } else {
-                    m.sent = '';
+                var update = {
+                    $set: {
+                        'pushly.$.result': message.result,
+                        result: m.result
+                    }
+                };
+                if (!m.sent && (m.result.status & MessageStatus.Done) > 0) {
+                    update.$set.sent = new Date();
                 }
 
-                common.db.collection('messages').update({_id: id, 'pushly.id': message.id}, {$set: {'pushly.$.result': message.result, result: m.result, sent: m.sent}});
+                common.db.collection('messages').update({_id: id, 'pushly.id': message.id}, update);
 
                 var count = m.result.sent - previouslySent;
                 if (count) common.db.collection('apps').findOne(appId(message), function(err, app){

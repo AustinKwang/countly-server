@@ -229,6 +229,13 @@
 		<div class="indicator"></div>
 		<div class="content"></div>
 	</div>
+	<div id="cly-loading" class="dialog black">
+		<div class="indicator"></div>
+		<div class="message"></div>
+		<div class="content">
+            <div id="content-loader"></div>
+		</div>
+	</div>
 	<div id="cly-alert" class="dialog">
 		<div class="indicator"></div>
 		<div class="message"></div>
@@ -1461,31 +1468,7 @@
 	    		{{> date-selector }}
 	    	</div>
 	    	<div class="widget-content">
-    	        <table id="push-table" cellspacing="0" class="d-table dashboard">
-    				<thead>
-    					<tr>
-    			            <th class="help-zone-vs" data-localize="push.table.message" data-help-localize="manage-pushes.message-view"></th>
-    			            <th class="help-zone-vs" data-localize="push.table.app-names" data-help-localize="manage-pushes.app-names-view"></th>
-    			            <th class="help-zone-vs" data-localize="push.table.delivered" data-help-localize="manage-pushes.delivered"></th>
-    			            <th class="help-zone-vs" data-localize="push.table.status" data-help-localize="manage-pushes.status"></th>
-    			            <th style="width:130px;" class="help-zone-vs" data-localize="push.table.created" data-help-localize="manage-pushes.app-names-view"></th>
-    			            <th style="width:130px;" class="help-zone-vs" data-localize="push.table.sent-scheduled" data-help-localize="manage-pushes.app-names-view"></th>
-    					</tr>
-    				</thead>
-    				<tbody>
-    				    {{#if pushes}}
-    			    		{{#eachOfObjectValue pushes}}
-    			            {{> message}}
-    			    		{{/eachOfObjectValue}}
-    				    {{else}}
-    					    <tr class="push-no-messages">
-    						    <td colspan="6">
-    						    	<p data-localize="push.no.messages"></p>
-    						    </td>
-    					    </tr>
-    				    {{/if}}
-    	            </tbody>
-    	        </table>
+				<table id="dataTableOne" class="d-table help-zone-vb" cellpadding="0" cellspacing="0" data-help-localize="{{{table-helper}}}"></table>
 	    	</div>
     	</div>
 

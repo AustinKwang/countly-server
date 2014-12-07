@@ -11,10 +11,10 @@ MessageStatus._deleted = [
     MessageStatus.Deleted,
     MessageStatus.InQueue | MessageStatus.Deleted,
     MessageStatus.InProcessing | MessageStatus.Deleted,
-    MessageStatus.Sent | MessageStatus.Deleted,
+    MessageStatus.Done | MessageStatus.Deleted,
     MessageStatus.Error | MessageStatus.Deleted,
     MessageStatus.Aborted | MessageStatus.Deleted,
-    MessageStatus.Aborted | MessageStatus.Deleted | MessageStatus.Sent,
+    MessageStatus.Aborted | MessageStatus.Deleted | MessageStatus.Done,
     MessageStatus.Aborted | MessageStatus.Deleted | MessageStatus.Error,
     MessageStatus.Aborted | MessageStatus.Deleted
 ];
@@ -272,7 +272,7 @@ module.exports.Message = function (apps, names) {
                 }
 
                 var idComponents = [this._id + ''];
-                
+
                 if (index) {
                 	idComponents = idComponents.concat(index);
                 } else {

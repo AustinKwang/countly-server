@@ -11,7 +11,7 @@
     };
 
 
-    //Private Properties 
+    //Private Properties
     var _pushDb = {},
         _activeAppKey = 0,
         _initialized = false;
@@ -30,7 +30,7 @@
                     type: "GET",
                     url:  countlyCommon.API_PARTS.pushes.r + '/all',
                     data: {
-                        "api_key": countlyGlobal.member.api_key, 
+                        "api_key": countlyGlobal.member.api_key,
                         "period": countlyCommon.getPeriodForAjax()
                     },
                     dataType: "jsonp",
@@ -173,21 +173,12 @@
             msg.percentNotSent = +(100 * (msg.result.total - msg.result.sent) / msg.result.total).toFixed(2);
         }
 
-        msg.created_local = moment(msg.created).format("D MMM, YYYY HH:mm");
-        msg.date_local = moment(msg.date).format("D MMM, YYYY HH:mm");
+        msg.local = {
+            created: moment(msg.created).format("D MMM, YYYY HH:mm")
+        };
 
-        var due = (moment(msg.date).unix() - moment().unix());
-
-        if (due > 0) {
-            // will soon be sent
-            msg.due_miliseconds = due * 1000;
-        } else if (msg.result.status === MessageStatus.Initial || (msg.result.status & (MessageStatus.InQueue | MessageStatus.InProcessing)) > 0) {
-            // just submitted, in queue or in processing: update every 3 seconds
-            msg.due_miliseconds = 3000;
-        } else if ((msg.result.status & MessageStatus.Sent) > 0 && msg.sent && (moment().unix() - moment(msg.sent).unix()) < 10) {
-            // just sent, update for last status changes
-            msg.due_miliseconds = 3000;
-        }
+        if (msg.date) msg.local.date = moment(msg.date).format("D MMM, YYYY HH:mm");
+        if (msg.sent) msg.local.sent = moment(msg.sent).format("D MMM, YYYY HH:mm");
 
         return msg;
     }

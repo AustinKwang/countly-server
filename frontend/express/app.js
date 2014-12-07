@@ -677,7 +677,7 @@ app.post('/events/delete', function (req, res, next) {
     }
 });
 
-fs.mkdir(__dirname + '/certificates');
+fs.mkdir(__dirname + '/certificates', function(){});
 app.post('/apps/certificate', function (req, res, next) {
     if (!req.files.apns_cert) {
         res.end();
