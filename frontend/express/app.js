@@ -243,7 +243,8 @@ app.get('/dashboard', function (req, res, next) {
                             userOfApps:userOfApps,
                             countlyVersion:"14.08",
                             member:member,
-			                cdn: countlyConfig.cdn || ""
+			                cdn: countlyConfig.cdn || "",
+							production: countlyConfig.production || false
                         });
                     });
                 }
@@ -318,7 +319,7 @@ app.get('/reset/:prid', function (req, res, next) {
 
 var auth = express.basicAuth(function(user, pass, callback) {
     var password = sha1Hash(pass);
-    countlyDb.collection('members').findOne({"username":user, "password":password}, function (err, member) {
+    countlyDb.collection('members').findOne({$or: [ {"username":user}, {"email":user} ], "password":password}, function (err, member) {
         callback(null, member);
     });
 });
@@ -422,7 +423,7 @@ app.post('/login', function (req, res, next) {
     if (req.body.username && req.body.password) {
         var password = sha1Hash(req.body.password);
 
-        countlyDb.collection('members').findOne({"username":req.body.username, "password":password}, function (err, member) {
+        countlyDb.collection('members').findOne({$or: [ {"username":req.body.username}, {"email":req.body.username} ], "password":password}, function (err, member) {
             if (member) {
                 countlyStats.totalUsers(function(userCount, appCount) {
                     countlyStats.totalEvents(function(eventCount) {

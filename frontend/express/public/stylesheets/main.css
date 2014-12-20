@@ -874,3 +874,5 @@ tr.push-no-messages:hover { background-color: white; }
 .allappview .widget-content .big-numbers .inner{height: 30px;}
 .allappview .widget-footer{border-radius: 0;}
 .allapps div.color{ width: 10px; height: 20px; float: right;}
+.allappview #empty-graph {position: absolute; text-align: center; font-size: 35px; width:100%; top:50%; margin-top: -20px; display: none;}
+.allapps div.color{ width: 10px; height: 20px; float: right;}
