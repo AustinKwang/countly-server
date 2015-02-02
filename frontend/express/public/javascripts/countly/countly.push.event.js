@@ -16,14 +16,6 @@
             _activeAppKey = countlyCommon.ACTIVE_APP_KEY;
             _initialized = true;
 
-            return $.when(
-                    eventAjax("[CLY]_push_sent"),
-                    eventAjax("[CLY]_push_open"),
-                    eventAjax("[CLY]_push_action")
-                ).then(function(){
-                    return true;
-                });
-
             function eventAjax(key) {
                 return $.ajax({
                     type: "GET",
@@ -42,21 +34,21 @@
                     }
                 });
             }
-        } else {
+
+            return $.when(
+                eventAjax("[CLY]_push_sent"),
+                eventAjax("[CLY]_push_open"),
+                eventAjax("[CLY]_push_action")
+            ).then(function(){
+                return true;
+            });
+       } else {
             return true;
         }
     };
 
     countlyPushEvents.refresh = function() {
         if (!countlyCommon.DEBUG) {
-            return $.when(
-                    eventAjax("[CLY]_push_sent"),
-                    eventAjax("[CLY]_push_open"),
-                    eventAjax("[CLY]_push_action")
-                ).then(function(){
-                    return true;
-                });
-
             function eventAjax(key) {
                 return $.ajax({
                     type: "GET",
@@ -76,6 +68,14 @@
                     }
                 })
             }
+
+            return $.when(
+                    eventAjax("[CLY]_push_sent"),
+                    eventAjax("[CLY]_push_open"),
+                    eventAjax("[CLY]_push_action")
+                ).then(function(){
+                    return true;
+                });
         } else {
             _pushEventsDb = {"2012":{}};
             return true;
@@ -92,7 +92,7 @@
             titles = [jQuery.i18n.map["common.sent"], jQuery.i18n.map["common.delivered"], jQuery.i18n.map["common.actions"]];
         events.forEach(function(event, i){
             var noSegmentIndex = _.pluck(_pushEventsDb[event], "_id"),
-                eventDb = _pushEventsDb[event][noSegmentIndex.indexOf('no-segment')] || {},
+                eventDb = _pushEventsDb[event] || {},
                 chartData = [
                     { data:[], label: titles[i], color: countlyCommon.GRAPH_COLORS[i] }
                 ],
@@ -155,7 +155,7 @@
         _periodObj = countlyCommon.periodObj;
 
         var noSegmentIndex = _.pluck(_pushEventsDb[eventKey], "_id"),
-            eventDb = _pushEventsDb[eventKey][noSegmentIndex.indexOf('no-segment')] || {};
+            eventDb = _pushEventsDb[eventKey] || {};
 
         if (!eventDb) {
             return {

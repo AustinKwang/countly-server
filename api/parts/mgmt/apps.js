@@ -104,8 +104,8 @@ var appsApi = {},
                 'timezone': { 'required': false, 'type': 'String' },
                 'country':  { 'required': false, 'type': 'String' },
                 'apn.id':  { 'required': false, 'type': 'String'/*, 'min-length': 5, 'max-length': 10 */ },
-                'gcm.id':  { 'required': false, 'type': 'String'/*, 'min-length': 12, 'max-length': 12 */ },
-                'gcm.key':      { 'required': false, 'type': 'String'/*, 'min-length': 32, 'max-length': 40 */ }
+                'gcm.id':   { 'required': false, 'type': 'String' },
+                'gcm.key':  { 'required': false, 'type': 'String' }
             },
             updatedApp = {}, $set = {}, $unset = {};
 

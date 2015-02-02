@@ -526,9 +526,6 @@ if (cluster.isMaster) {
                     case 'create':
                         validateUserForWriteAPI(countlyApi.push.createMessage, params);
                         break;
-                    case 'retry':
-                        validateUserForWriteAPI(countlyApi.push.retryMessage, params);
-                        break;
                     case 'refresh':
                         validateUserForWriteAPI(countlyApi.push.refreshMessage, params);
                         break;

@@ -352,13 +352,19 @@
 					<input type="text" class="push-link" data-localize="push.placeholder.extra-link">
 				</div>
 			</div>
+			<div class="field category">
+				<div class="title" data-localize="push.category"></div>
+				<div class="details">
+					<input type="text" class="push-category" data-localize="push.placeholder.extra-category">
+				</div>
+			</div>
 			<div class="divide create-header">
 				<div class="field">
 					<div class="title" data-localize="push.type"></div>
 					<div class="details cly-select">
 						<div class="select-inner">
 							<div class="text-container">
-								<div class="text" data-localize="push.type.message" data-value="message"></div>
+								<div class="text"></div>
 							</div>
 							<div class="right combo"></div>
 						</div>
@@ -366,6 +372,7 @@
 							<div>
 								<div data-value="message" class="item" data-localize="push.type.message"></div>
 								<div data-value="link" class="item" data-localize="push.type.link"></div>
+								<div data-value="category" class="item" data-localize="push.type.category"></div>
 								<div data-value="update" class="item" data-localize="push.type.update"></div>
 								<div data-value="review" class="item" data-localize="push.type.review"></div>
 								<div data-value="data" class="item" data-localize="push.type.data"></div>
@@ -1442,9 +1449,9 @@
 				<div id="dashboard-graph-secondary" class="graph" style="height:100%; margin-left:-10px;"></div>
 			</div>
 			<div class="widget-footer" style="background-color:#EEEEEE;">
-				<div class="fix-two-columns">
+				<div class="fix-two-columns two-column">
 					{{#each big-numbers-secondary}}
-					<div class="big-numbers two-column help-zone-vs" data-help-localize="{{this.help}}">
+					<div class="big-numbers help-zone-vs" data-help-localize="{{this.help}}">
 						<div class="inner">
 							<div class="select">{{this.title}}</div>
 							<div class="color"></div>
@@ -1465,41 +1472,16 @@
 	    			<div class="logo messaging"></div>
 	    			<div class="title">{{page-title}}</div>
 	    		</div>
-				<a class="icon-button green btn-create-message" data-localize="push.create"></a>
+				<a class="icon-button green btn-header btn-create-message" data-localize="push.create"></a>
 	    		{{> date-selector }}
 	    	</div>
 	    	<div class="widget-content">
-				<table id="dataTableOne" class="d-table help-zone-vb" cellpadding="0" cellspacing="0" data-help-localize="{{{table-helper}}}"></table>
+ 				<table id="dataTableOne" class="d-table help-zone-vb" cellpadding="0" cellspacing="0" data-help-localize="{{{table-helper}}}"></table>
 	    	</div>
     	</div>
 
 
     </script>
-
-    <script id="template-message-partial" type="text/x-handlebars-template">
-        <tr data-mid="{{this._id}}">
-            <td class="push-message">
-            	{{#messageText this}} {{/messageText}}
-            </td>
-            <td class="push-app-name">{{#appIdsToNames this.apps}}{{/appIdsToNames}}</td>
-            <td class="push-delivered">
-                <div class="bar" data-desc="{{this.percentDelivered}}%">
-                    <div class="bar-inner" style="width:{{this.percentDelivered}}%;" data-item="{{this.percentDelivered}}%"></div>
-                    <div class="bar-inner" style="width:{{this.percentNotDelivered}}%;" data-item="{{this.percentNotDelivered}}%"></div>
-                </div>
-                <div class="percent-text">{{this.result.delivered}} / {{this.result.sent}}</div>
-            </td>
-            <td class="push-status">
-                <span data-localize="push.message.status.{{this.result.status}}"></span>
-                {{#if this.recipients}}
-                <span style="color:#AAA;">({{this.result.total}} <span style="text-transform:lowercase;" data-localize="common-pushes.recipients"></span>)</span>
-                {{/if}}
-            </td>
-            <td>{{this.created_local}}</td>
-            <td>{{this.date_local}}</td>
-        </tr>
-    </script>
-
 
     <div id="IntercomDefaultWidget" style="visibility: visible;"><span></span></div>
 

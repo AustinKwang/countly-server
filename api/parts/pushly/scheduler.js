@@ -9,10 +9,28 @@ var _               = require('underscore'),
     MessageStatus   = mess.MessageStatus;
 
 var check = function() {
+    function addPushly(appId, match, creds, query, message, pushly) {
+        common.db.collection('app_users' + appId).count(match, function(err, count){
+            if (count) {
+                var msg = message.toPushly(creds, query, [''+ appId, creds.id]);
+
+                common.db.collection('messages').update(
+                    {_id: message._id},
+                    {
+                        $addToSet: {pushly: {id: msg.id, query: query, result: msg.result}},
+                        $set: {'result.status': MessageStatus.InQueue}
+                    }
+                );
+
+                pushly.push(msg);
+            }
+        });
+    }
+
 	common.db.collection('messages').findAndModify(
-		{date: {$lt: new Date()}, 'result.status': MessageStatus.Initial, 'deleted': {$exists: false}}, 
+		{date: {$lt: new Date()}, 'result.status': MessageStatus.Initial, 'deleted': {$exists: false}},
 		[['date', 1]],
-		{$set: {'result.status': MessageStatus.InProcessing}}, 
+		{$set: {'result.status': MessageStatus.InProcessing}},
 		{'new': true},
 
 		function(err, message){
@@ -52,27 +70,7 @@ var check = function() {
 
                                     // count first to prevent no users errors within some of app-platform combinations
                                     // of the message which will turn message status to error
-                                    common.db.collection('app_users' + app._id).count(match, function(err, count){
-                                        if (count) {
-                                            var msg = message.toPushly(creds, query, [appId, creds.id]);
-                                            
-                                            common.db.collection('messages').update(
-                                                {_id: message._id}, 
-                                                {
-                                                    $addToSet: {pushly: {id: msg.id, query: query, result: msg.result}}, 
-                                                    $set: {'result.status': MessageStatus.InQueue}
-                                                }
-                                            );
-
-                                            pushly.push(msg);
-                                        }
-                                    });
-
-                                    // // pushly messages to send
-                                    // toPush.push(msg);
-
-                                    // // submessages for Countly message object in DB
-                                    // message.pushly.push({id: msg.id, query: query, result: msg.result});
+                                    addPushly(app._id, match, creds, query, message, pushly);
                                 }
                             }
 						} else {
@@ -93,7 +91,7 @@ var check = function() {
 var launched = false;
 
 var periodicCheck = function(){
-	if (cluster.isMaster) {
+    if (cluster.isMaster) {
         if (!launched) {
             setTimeout(function(){  // wait for app to start
                 common.db.collection('messages').update({'result.status': {$in: [MessageStatus.InProcessing]}}, {$set: {'result.status': MessageStatus.Initial}}, function(){

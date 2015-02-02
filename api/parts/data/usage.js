@@ -351,7 +351,7 @@ var usage = {},
             var keys = messagingTokenAndPlatformsKeys(dbAppUser);
             if (keys.length) common.fillTimeObject(params, tmpTimeObj, lang + '.' + common.dbMap['messaging-enabled']);
             for (var i in keys) common.fillTimeObject(params, tmpTimeObj, lang + '.' + keys[i]);
-           
+
             common.db.collection('langs').update({'_id': params.app_id}, {'$inc': tmpTimeObj, '$addToSet': tmpSet}, {'upsert': true});
         }
 
@@ -408,14 +408,14 @@ var usage = {},
             return false;
         }
 
-        if (params.qstring.metrics._locale) {
+        if (params.qstring.metrics && params.qstring.metrics._locale) {
             var locale = params.qstring.metrics._locale, lang = langs.languageFromLocale(locale);
             params.qstring.metrics._lang = lang;
 
             if (isNewUser || user[common.dbUserMap['locale']] != locale) {
                 userProps[common.dbUserMap['locale']] = locale;
             }
-        } 
+        }
 
         var predefinedMetrics = [
             { db: "devices", metrics: [{ name: "_device", set: "devices", short_code: common.dbUserMap['device'] }] },

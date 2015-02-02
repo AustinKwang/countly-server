@@ -384,33 +384,13 @@ var pushly 			= require('pushly')(),
                                 match = {$match: {}},
                                 group = {$group: {_id: '$' + common.dbUserMap.lang, count: {$sum: 1}}};
                             match.$match[common.dbUserMap.tokens + '.' + field] = {$exists: true};
+                            for (var k in msg.conditions) {
+                                match.$match[k] = msg.conditions[k];
+                            }
 
                             common.db.collection('app_users' + app._id).aggregate([match, group], function(err, results){
                                 clb(err, {field: field, results: results});
                             });
-                            // common.db.collection('langs').findOne(app._id, function(err, langs){
-                            //     if (err || !langs) clb(err || new Error('No langs'));
-                            //     else {
-                            //         var languages = langs.meta && langs.meta.langs ? langs.meta.langs : [];
-                            //         var year = new Date().getFullYear(),
-                            //             TOTALLY = {app: app._id, TOTALLY: 0}, l;
-
-                            //         for (l in languages) TOTALLY[languages[l]] = 0;
-
-                            //         while (year in langs) {
-                            //             for (l in languages) {
-                            //                 var language = languages[l];
-                            //                 if (language in langs[year]) {
-                            //                     TOTALLY[language] += langs[year][language][creds.id.split('.')[0]] || 0;
-                            //                     TOTALLY.TOTALLY += langs[year][language][creds.id.split('.')[0]] || 0;
-                            //                 }
-                            //             }
-                            //             year -= 1;
-                            //         }
-
-                            //         clb(null, TOTALLY);
-                            //     }
-                            // });
                         });
                     });
                 });
@@ -437,24 +417,6 @@ var pushly 			= require('pushly')(),
                             }
                         }
                         callback(null, TOTALLY);
-
-                        // var TOTALLY = {TOTALLY: {TOTALLY: 0}};
-                        // for (var i in results) {
-                        //     var app = results[i].app;
-                        //     if (!TOTALLY[app]) TOTALLY[app] = {};
-                        //     for (var l in results[i]) {
-                        //         if (l === 'app') continue;
-                        //         else {
-                        //             if (!TOTALLY[app][l]) TOTALLY[app][l] = results[i][l];
-                        //             else TOTALLY[app][l] += results[i][l];
-
-                        //             if (!TOTALLY.TOTALLY[l]) TOTALLY.TOTALLY[l] = results[i][l];
-                        //             else TOTALLY.TOTALLY[l] += results[i][l];
-                        //         }
-                        //     }
-                        // }
-                        // console.log('TOTALLY got %j from results %j', TOTALLY, results);
-                        // callback(null, TOTALLY);
                     }
                 });
             }
@@ -526,17 +488,18 @@ var pushly 			= require('pushly')(),
                 'type':                 { 'required': true,  'type': 'String'  },
                 'apps':                 { 'required': true,  'type': 'Array'   },
                 'platforms':            { 'required': true,  'type': 'Array'   },
-                'appNames':            	{ 'required': true,  'type': 'Array'   },
-                'messagePerLocale':     { 'required': true,  'type': 'Object'  },
+                'messagePerLocale':     { 'required': false, 'type': 'Object'  },
                 'locales':              { 'required': false, 'type': 'Object'  },
                 'conditions':           { 'required': false, 'type': 'Object'  },
                 'sound':                { 'required': false, 'type': 'String'  },
                 'badge':                { 'required': false, 'type': 'Number'  },
                 'url':                  { 'required': false, 'type': 'URL'     },
-                'update':               { 'required': false, 'type': 'Boolean' },
-                'review':               { 'required': false, 'type': 'Boolean' },
+                'category':             { 'required': false, 'type': 'String'  },
                 'contentAvailable':    	{ 'required': false, 'type': 'Boolean' },
                 'newsstandAvailable':   { 'required': false, 'type': 'Boolean' },
+                'collapseKey':          { 'required': false, 'type': 'String'  },
+                'delayWhileIdle':       { 'required': false, 'type': 'Boolean' },
+                'data':                 { 'required': false, 'type': 'Object'  },
                 'test':                 { 'required': false, 'type': 'Boolean' }
             },
             msg = {};
@@ -544,6 +507,44 @@ var pushly 			= require('pushly')(),
         if (!(msg = common.validateArgs(params.qstring.args, argProps))) {
             common.returnOutput(params, {error: 'Not enough args'});
             return false;
+        }
+
+        if (['message', 'link', 'category', 'data', 'update', 'review'].indexOf(msg.type) === -1) {
+            common.returnOutput(params, {error: 'Bad message type'});
+            return false;
+        }
+
+        for (var platform in msg.platforms) if ([Platform.APNS, Platform.GCM].indexOf(msg.platforms[platform]) === -1) {
+            common.returnOutput(params, {error: 'Bad message plaform "' + msg.platforms[plaform] + '", only "' + Platform.APNS + '" (APNS) and "' + Platform.GCM + '" (GCM) are supported'});
+            return false;
+        }
+
+        if (msg.type !== 'data' && !msg.messagePerLocale) {
+            common.returnOutput(params, {error: 'Messages of type other than "data" must have "messagePerLocale"'});
+            return false;
+        }
+
+        if (msg.type === 'data' && !msg.data) {
+            common.returnOutput(params, {error: 'Messages of type "data" must have "data" property'});
+            return false;
+        }
+
+        if (msg.type === 'link' && !msg.url) {
+            common.returnOutput(params, {error: 'Messages of type "link" must have valid URL in "url" property'});
+            return false;
+        }
+
+        if (msg.type === 'category' && !msg.category) {
+            common.returnOutput(params, {error: 'Messages of type "category" must have "category" property'});
+            return false;
+        }
+
+        if (msg.type === 'update' && typeof params.qstring.args.update === 'boolean') {
+            msg.update = '';
+        }
+
+        if (msg.type === 'review' && typeof params.qstring.args.review === 'boolean') {
+            msg.review = '';
         }
 
         var message = {};
@@ -573,7 +574,7 @@ var pushly 			= require('pushly')(),
                         if (!TOTALLY || !TOTALLY.TOTALLY || TOTALLY.TOTALLY.TOTALLY) { // :)
                             common.returnOutput(params, {error: 'No push enabled users found for the selected apps-platforms-test combinations'});
                         } else {
-                            var message = new Message(msg.apps, msg.appNames)
+                            var message = new Message(msg.apps, _.pluck(apps, 'name'))
                                 .setId(new common.db.ObjectID())
                                 .setType(msg.type)
                                 .setMessagePerLocale(msg.messagePerLocale)
@@ -588,6 +589,9 @@ var pushly 			= require('pushly')(),
                                 .setTest(msg.test)
                                 .setContentAvailable(msg.contentAvailable)
                                 .setNewsstandAvailable(msg.newsstandAvailable)
+                                .setCollapseKey(msg.collapseKey)
+                                .setDelayWhileIdle(msg.delayWhileIdle)
+                                .setData(msg.data)
                                 .schedule(msg.date);
 
                             common.db.collection('messages').save(mess.cleanObj(message), function(err) {

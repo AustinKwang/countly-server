@@ -351,7 +351,7 @@ div.datatablesubrow {display: none;}
 	#date-picker .button-container { overflow:auto; margin-top:6px; padding:3px; }
 #date-picker-button:hover { box-shadow:0 0 5px 2px #fff; }
 
-.two-column, .two-column .big-numbers { width:50%; }
+.two-column .big-numbers { width:50%; }
 .one-column .big-numbers { width:100%; position:relative; }
 
 .three-column { width:33%; }
@@ -697,7 +697,6 @@ table.events-table { width:100%; padding:0; margin:0; }
 .enterprise-content .image { float:left; }
 .enterprise-content .text { font-family: Ubuntu; font-size:15px; color:#555; line-height: 22px; }
 
-<<<<<<< HEAD
 .clearfix {clear: both;}
 #push-create, .push-create { display: none; width: 620px; max-width: 620px; height: 645px; }
 	.push-create .indicator { margin-bottom: 0; }
@@ -729,8 +728,8 @@ table.events-table { width:100%; padding:0; margin:0; }
 	.push-create a.push-platform { margin-right:10px; color: #6b6b6b; cursor: default; }
 	.push-create a.push-platform i { font-size:30px; }
 
-	.push-create .field.date .details, .push-create .field.link .details { border: 1px solid rgba(0,0,0,0.5); border-radius: 6px; padding: 5px; }
-	.push-create .field.link { display: none; }
+	.push-create .field.date .details, .push-create .field.link .details, .push-create .field.category .details { border: 1px solid rgba(0,0,0,0.5); border-radius: 6px; padding: 5px; }
+	.push-create .field.link, .push-create .field.category { display: none; }
 	.push-create .field .cly-select { width: 280px; height: 28px; }
 	.push-create .field .cly-select .select-items { width: 280px; }
 
@@ -848,7 +847,10 @@ tr.push-no-messages:hover { background-color: white; }
 .cly-loading .message { text-align: center; }
 .cly-loading #content-loader { margin-left: -24px; }
 
-.btn-create-message { float: right; margin-top: 6px; height: 17px; margin-left: 11px; margin-right: 3px; }
+.btn-header { float: right; margin-top: 6px; height: 17px; margin-left: 8px; margin-right: 3px; overflow: hidden; }
+.btn-header.left { margin-top: 6px; margin-left: 17px; }
+.btn-header :before {line-height: 10px; vertical-align: bottom;}
+#segmentation .btn-header {margin-top: 0; margin-left: 5px;}
 
 #intermediate-numbers-container .big-numbers .inner { height: 65px; position: relative; padding: 20px; }
 #intermediate-numbers-container .big-numbers .inner .logo { position: absolute; top: 50%;  margin-top: -30px; left: 20px; }

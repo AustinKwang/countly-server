@@ -142,13 +142,26 @@ $.extend(Template.prototype, {
         delete countlyGlobal["message"];
     };
 
-    CountlyHelpers.popup = function (elementId, custClass) {
+    CountlyHelpers.popup = function (element, custClass, isHTML) {
         var dialog = $("#cly-popup").clone();
         dialog.removeAttr("id");
         if (custClass) {
             dialog.addClass(custClass);
         }
-        dialog.find(".content").html($(elementId).html());
+
+        if (isHTML) {
+            dialog.find(".content").html(element);
+        } else {
+            dialog.find(".content").html($(element).html());
+        }
+
+        revealDialog(dialog);
+    };
+
+    CountlyHelpers.openResource = function(url) {
+        var dialog = $("#cly-resource").clone();
+        dialog.removeAttr("id");
+        dialog.find(".content").html("<iframe style='border-radius:5px; border:none; width:800px; height:600px;' src='" + url + "'></iframe>");
 
         revealDialog(dialog);
     };
@@ -193,7 +206,130 @@ $.extend(Template.prototype, {
         return dialog;
     };
 
-	CountlyHelpers.refreshTable = function(dTable, newDataArr) {
+    CountlyHelpers.setUpDateSelectors = function(self) {
+        $("#month").text(moment().year());
+        $("#day").text(moment().format("MMM"));
+        $("#yesterday").text(moment().subtract("days",1).format("Do"));
+
+        $("#date-selector").find(">.button").click(function () {
+            if ($(this).hasClass("selected")) {
+                return true;
+            }
+
+            self.dateFromSelected = null;
+            self.dateToSelected = null;
+
+            $(".date-selector").removeClass("selected").removeClass("active");
+            $(this).addClass("selected");
+            var selectedPeriod = $(this).attr("id");
+
+            if (countlyCommon.getPeriod() == selectedPeriod) {
+                return true;
+            }
+
+            countlyCommon.setPeriod(selectedPeriod);
+
+            self.dateChanged(selectedPeriod);
+
+            $("#" + selectedPeriod).addClass("active");
+        });
+
+        $("#date-selector").find(">.button").each(function(){
+            if (countlyCommon.getPeriod() == $(this).attr("id")) {
+                $(this).addClass("active").addClass("selected");
+            }
+        });
+    };
+
+    CountlyHelpers.initializeSelect = function (element) {
+        element = element || $("#content-container");
+        element.off("click", ".cly-select").on("click", ".cly-select", function (e) {
+            if ($(this).hasClass("disabled")) {
+                return true;
+            }
+
+            $(this).removeClass("req");
+
+            var selectItems = $(this).find(".select-items"),
+                itemCount = selectItems.find(".item").length;
+
+            if (!selectItems.length) {
+                return false;
+            }
+
+            $(".cly-select").find(".search").remove();
+
+            if (selectItems.is(":visible")) {
+                $(this).removeClass("active");
+            } else {
+                $(".cly-select").removeClass("active");
+                $(".select-items").hide();
+                $(this).addClass("active");
+
+                if (itemCount > 10 && !$(this).hasClass("centered")) {
+                    $("<div class='search'><div class='inner'><input type='text' /><i class='icon-search'></i></div></div>").insertBefore($(this).find(".select-items"));
+                }
+            }
+
+            if ($(this).hasClass("centered")) {
+                var height = $(this).find(".select-items").height();
+                $(this).find(".select-items").css("margin-top", (-(height/2).toFixed(0) - ($(this).height()/2).toFixed(0)) + "px");
+            }
+
+            if ($(this).find(".select-items").is(":visible")) {
+                $(this).find(".select-items").hide();
+            } else {
+                $(this).find(".select-items").show();
+                $(this).find(".select-items>div").addClass("scroll-list");
+                $(this).find(".scroll-list").slimScroll({
+                    height:'100%',
+                    start:'top',
+                    wheelStep:10,
+                    position:'right',
+                    disableFadeOut:true
+                });
+            }
+
+            $(this).find(".search input").focus();
+
+            $("#date-picker").hide();
+            e.stopPropagation();
+        });
+
+        element.off("click", ".select-items .item").on("click", ".select-items .item", function () {
+            var selectedItem = $(this).parents(".cly-select").find(".text");
+            selectedItem.text($(this).text());
+            selectedItem.data("value", $(this).data("value"));
+        });
+
+        element.off("click", ".cly-select .search").on("click", ".cly-select .search", function (e) {
+            e.stopPropagation();
+        });
+
+        element.off("keyup", ".cly-select .search input").on("keyup", ".cly-select .search input", function(event) {
+            if (!$(this).val()) {
+                $(this).parents(".cly-select").find(".item").removeClass("hidden");
+            } else {
+                $(this).parents(".cly-select").find(".item:not(:contains('" + $(this).val() + "'))").addClass("hidden");
+                $(this).parents(".cly-select").find(".item:contains('" + $(this).val() + "')").removeClass("hidden");
+            }
+        });
+
+        element.off('mouseenter').on('mouseenter', ".cly-select .item", function () {
+            var item = $(this);
+
+            if (this.offsetWidth < this.scrollWidth && !item.attr('title')) {
+                item.attr('title', item.text());
+            }
+        });
+
+        $(window).click(function () {
+            $(".select-items").hide();
+            $(".cly-select").find(".search").remove();
+        });
+    };
+
+    CountlyHelpers.refreshTable = function(dTable, newDataArr) {
         var oSettings = dTable.fnSettings();
         dTable.fnClearTable(false);
 
@@ -269,7 +405,7 @@ $.extend(Template.prototype, {
     CountlyHelpers.clip = function(f) {
         return function(opt) {
             var res = f(opt);
-            return '<div class="clip">' + res + '</div>';
+            return '<div class="clip' + (res ? '' : ' nothing') + '">' + (res || jQuery.i18n.map['push.no-message']) + '</div>';
         }
     };
 
@@ -3206,29 +3342,25 @@ window.MessagingDashboardView = countlyView.extend({
             {
                 percentage: action + '%',
                 title: jQuery.i18n.map['push.rate.action'],
-                help: 'dashboard.push.actions-rate' },
+                help: 'dashboard.push.actions-rate' }
         ];
 
         this.templateData = templateData;
 
-        if (!isRefresh) {
-            $(this.el).html(this.template(this.templateData));
+        $(this.el).html(this.template(this.templateData));
+        countlyCommon.drawTimeGraph(pushDP.chartDP, "#dashboard-graph");
+        countlyCommon.drawTimeGraph(messUserDP.chartDP, "#dashboard-graph-secondary");
 
-            countlyCommon.drawTimeGraph(pushDP.chartDP, "#dashboard-graph");
-            countlyCommon.drawTimeGraph(messUserDP.chartDP, "#dashboard-graph-secondary");
-            $(".sortable").stickyTableHeaders();
-
-            var self = this;
-            $(".sortable").tablesorter({
-                sortList:this.sortList,
-                headers:{
-                    0:{ sorter:'customDate' }
-                }
-            });
+        if (isRefresh) {
+            CountlyHelpers.setUpDateSelectors(this);
+            app.localize();
         }
     },
     refresh:function () {
         $.when(this.beforeRender()).then(this.renderCommon.bind(this, true));
+    },
+    dateChanged: function() {
+        this.refresh();
     }
 });
 
@@ -3254,7 +3386,7 @@ window.MessagingListView = countlyView.extend({
                                 '<div class="bar-inner" style="width:' + d + '%;" data-item="' + d + '%"></div>' +
                                 '<div class="bar-inner" style="width:' + data.percentNotDelivered + '%;" data-item="' + data.percentNotDelivered + '%"></div> ' +
                             '</div>' +
-                            '<div class="percent-text">' + jQuery.i18n.prop('push.count.sent', d) + '%</div>';
+                            '<div class="percent-text">' + jQuery.i18n.prop('push.count.sent', data.percentDelivered, data.result.sent) + '</div>';
                 }, "sTitle": jQuery.i18n.map["push.table.delivered"] },
                 { "mData": "result", sType:"string", "mRender":function(d) { return '<span data-localize="push.message.status.' + d.status + '"></span>'; }, "sTitle": jQuery.i18n.map["push.table.status"] },
                 { "mData": "local.created", sType:"date", "sTitle": jQuery.i18n.map["push.table.created"] },
@@ -3265,7 +3397,6 @@ window.MessagingListView = countlyView.extend({
             "aaSorting": [[4, 'desc']],
             "fnCreatedRow": function(row, data, i) {
                 $(row).attr('data-mid', data._id);
-                $(row).find('.percent-text').text(jQuery.i18n.prop('push.count.sent', data.percentDelivered, data.result.sent));
             }
         }));
 
@@ -3301,11 +3432,15 @@ window.MessagingListView = countlyView.extend({
         this.renderTable();
 
         if (isRefresh) {
+            CountlyHelpers.setUpDateSelectors(this);
             app.localize();
         }
     },
     refresh: function(){
         $.when(this.beforeRender()).then(this.renderCommon.bind(this, true));
+    },
+    dateChanged: function() {
+        this.refresh();
     }
 });
 
@@ -3337,7 +3472,7 @@ var PushPopup = function(message, duplicate) {
         message = {
             _id: message._id,
             duplicate: message,
-            type: message.type,
+            type: message.type || 'message',
             apps: message.apps.slice(0),
             appNames: [],
             platforms: message.platforms.slice(0),
@@ -3349,11 +3484,21 @@ var PushPopup = function(message, duplicate) {
             review: duplicate ? message.review : !!message.review,
             badge: duplicate ? message.badge : typeof message.badge === 'undefined' ? false : true,
             data: duplicate ? message.data : typeof message.data === 'undefined' ? false : true,
+            url: duplicate ? message.url : typeof message.url === 'undefined' ? false : true,
             test: message.test,
             date: message.date,
-            sent: message.sent
+            sent: message.sent,
+            conditions: message.conditions,
+            noTests: false,
+            noApps: false,
+            noPlatforms: false
         }
         for (var i in message.apps) for (var a in allApps) if (allApps[a]._id === message.apps[i]) message.appNames.push(allApps[a].name);
+        if (message.conditions && message.conditions._id) {
+            message.noTests = true;
+            message.noApps = true;
+            message.noPlatforms = true;
+        }
     } else {
         message = {
             type: 'message',
@@ -3362,10 +3507,13 @@ var PushPopup = function(message, duplicate) {
             platforms: [],
             appsPlatforms: [],
             messagePerLocale: {
-                default: ''
+                "default": ''
             },
-            sound: true
-        };
+            sound: true,
+            noTests: false,
+            noApps: false,
+            noPlatforms: false
+       };
     }
 
     var dialog = $("#cly-popup").clone().removeAttr("id").addClass('push-create');
@@ -3385,6 +3533,10 @@ var PushPopup = function(message, duplicate) {
     if (isView) {
         content.find('.view-apps .view-value').text(message.appNames.join(', '));
     } else {
+        if (message.noApps) {
+            content.find('.field.apps').hide();
+        }
+
         content.find(".select-apps").on('click', function(ev){
             if ($('#listof-apps').length) {
                 $('#listof-apps').remove();
@@ -3487,6 +3639,10 @@ var PushPopup = function(message, duplicate) {
     } else {
         fillAppsPlatforms(duplicate);
 
+        if (message.noPlatforms) {
+            content.find('.field.platforms').hide();
+        }
+
         if (!message.platforms.length) {
             return false;
         }
@@ -3513,12 +3669,15 @@ var PushPopup = function(message, duplicate) {
         update: 540,
         review: 540,
         data: 378,
-        link: 613
+        link: 613,
+        category: 613
     };
+    if (message.noPlatforms && message.noApps) for (var k in heights) heights[k] -= 90;
+
     if (isView) {
         content.find('.view-type .view-value').text(jQuery.i18n.map['push.type.' + message.type]);
         // CountlyHelpers.changeDialogHeight(dialog, 470);
-        setTimeout(CountlyHelpers.changeDialogHeight.bind(CountlyHelpers, dialog, 470), 20);
+        setTimeout(CountlyHelpers.changeDialogHeight.bind(CountlyHelpers, dialog, message.type == 'data' ? 310 : 470), 20);
     } else {
         CountlyHelpers.initializeSelect(content);
 
@@ -3527,38 +3686,60 @@ var PushPopup = function(message, duplicate) {
         });
 
         var link = content.find('.field.link'),
+            category = content.find('.field.category'),
             msg = content.find('.field.msg'),
             sound = content.find('.extra-sound-check').parents('tr'),
             badge = content.find('.extra-badge-check').parents('tr'),
             data = content.find('.extra-data-check').parents('tr');
 
-        setTimeout(setMessageType.bind(this, 'message'), 20);
+        if (message.type == 'link') {
+            link.find('.push-link').val(message.url);
+        }
+
+        if (message.type == 'category') {
+            category.find('.push-category').val(message.category);
+        }
 
         function setMessageType(type) {
             message.type = type;
+            content.find('.cly-select .text').text(jQuery.i18n.map['push.type.' + type]);
 
             if (type === 'message' || type === 'update' || type === 'review') {
                 link.slideUp();
+                category.slideUp();
                 msg.slideDown();
                 sound.slideDown();
                 badge.slideDown();
                 data.slideDown();
             } else if (type === 'data') {
                 link.slideUp();
+                category.slideUp();
                 msg.slideUp();
                 sound.slideDown();
                 badge.slideDown();
                 data.slideDown();
             } else if (type === 'link') {
                 link.slideDown();
+                category.slideUp();
+                msg.slideDown();
+                sound.slideDown();
+                badge.slideDown();
+                data.slideDown();
+            } else if (type === 'category') {
+                link.slideUp();
+                category.slideDown();
                 msg.slideDown();
                 sound.slideDown();
                 badge.slideDown();
                 data.slideDown();
             }
 
+            checkMessageForSendButton();
+
             CountlyHelpers.changeDialogHeight(dialog, heights[type], true);
         }
+
+        setTimeout(setMessageType.bind(this, message.type), 20);
     }
 
     // Date / send later
@@ -3567,57 +3748,10 @@ var PushPopup = function(message, duplicate) {
         content.find('.view-date .view-value').text(message.date ? moment(message.date).format(fmt) : '');
         content.find('.view-sent .view-value').text(message.sent ? moment(message.sent).format(fmt) : '');
     } else {
-        content.find(".send-later-datepicker").datepicker({
-            numberOfMonths:1,
-            showOtherMonths:true,
-            minDate:new Date(),
-            onSelect:function (selectedDate) {
-                var instance = $(this).data("datepicker"),
-                    date = $.datepicker.parseDate(instance.settings.dateFormat || $.datepicker._defaults.dateFormat, selectedDate, instance.settings);
-
-                if (moment(date).format("DD-MM-YYYY") == moment().format("DD-MM-YYYY")) {
-                    initTimePicker(true);
-                } else {
-                    initTimePicker();
-                }
-            }
-        });
-
-        content.find(".send-later-datepicker").datepicker("option", $.datepicker.regional[countlyCommon.BROWSER_LANG]);
-
-        initTimePicker(true);
-
         var hidePicker = function(){
             $(document.body).off('click', hidePicker);
             content.find(".date-picker-push").hide();
         };
-
-        // content.find(".send-later").next('label').on("click", content.find(".send-later").trigger.bind(content.find(".send-later"), "click"));
-        content.find(".send-later").on("click", function (e) {
-            if ($(this).is(":checked")) {
-                content.find(".date-picker-push").show();
-                setTimeText();
-                $(document.body).off('click', hidePicker).on('click', hidePicker);
-            } else {
-                content.find(".date-picker-push").hide();
-                content.find(".send-later-date").text("");
-            }
-
-            e.stopPropagation();
-        });
-
-        content.find(".send-later-date").on('click', function(e){
-            e.stopPropagation();
-
-            $(document.body).off('click', hidePicker);
-
-            if (content.find(".date-picker-push").is(':visible')) {
-                content.find(".date-picker-push").hide();
-            } else {
-                content.find(".date-picker-push").show();
-                $(document.body).on('click', hidePicker);
-            }
-        });
 
         function setTimeText() {
             var laterText = moment(content.find(".send-later-datepicker").datepicker("getDate")).format("DD.MM.YYYY");
@@ -3658,6 +3792,53 @@ var PushPopup = function(message, duplicate) {
             }
         }
 
+        content.find(".send-later-datepicker").datepicker({
+            numberOfMonths:1,
+            showOtherMonths:true,
+            minDate:new Date(),
+            onSelect:function (selectedDate) {
+                var instance = $(this).data("datepicker"),
+                    date = $.datepicker.parseDate(instance.settings.dateFormat || $.datepicker._defaults.dateFormat, selectedDate, instance.settings);
+
+                if (moment(date).format("DD-MM-YYYY") == moment().format("DD-MM-YYYY")) {
+                    initTimePicker(true);
+                } else {
+                    initTimePicker();
+                }
+            }
+        });
+
+        content.find(".send-later-datepicker").datepicker("option", $.datepicker.regional[countlyCommon.BROWSER_LANG]);
+
+        initTimePicker(true);
+
+        // content.find(".send-later").next('label').on("click", content.find(".send-later").trigger.bind(content.find(".send-later"), "click"));
+        content.find(".send-later").on("click", function (e) {
+            if ($(this).is(":checked")) {
+                content.find(".date-picker-push").show();
+                setTimeText();
+                $(document.body).off('click', hidePicker).on('click', hidePicker);
+            } else {
+                content.find(".date-picker-push").hide();
+                content.find(".send-later-date").text("");
+            }
+
+            e.stopPropagation();
+        });
+
+        content.find(".send-later-date").on('click', function(e){
+            e.stopPropagation();
+
+            $(document.body).off('click', hidePicker);
+
+            if (content.find(".date-picker-push").is(':visible')) {
+                content.find(".date-picker-push").hide();
+            } else {
+                content.find(".date-picker-push").show();
+                $(document.body).on('click', hidePicker);
+            }
+        });
+
         content.find(".time-picker-push").on("click", "span", function() {
             content.find(".time-picker-push").find("span").removeClass("active");
             $(this).addClass("active");
@@ -3666,7 +3847,7 @@ var PushPopup = function(message, duplicate) {
     }
 
     // Locales / message
-    {
+    // {
         message.usedLocales = {};
         var ul = content.find('.locales ul'),
             txt = content.find('.msg textarea'),
@@ -3688,24 +3869,6 @@ var PushPopup = function(message, duplicate) {
                         });
                 return el;
             };
-
-        if (isView) {
-            message.usedLocales = _.extend({}, message.locales);
-            fillLocales();
-        } else {
-            txt.on('blur', setUsedLocales);
-            // wait for device count download
-
-            // message.apps.forEach(function(appId){
-            //     var app = allApps[appId];
-
-            //     if (appId in locales) for (var locale in locales[appId]) {
-            //         if (!(locale in message.usedLocales)) message.usedLocales[locale] = 0;
-            //         message.usedLocales[locale] += locales[appId][locale];
-            //     }
-            // });
-            // for (var locale in message.usedLocales) message.usedLocales[locale] /= message.apps.length;
-        }
 
         function fillLocales() {
             ul.empty();
@@ -3742,7 +3905,28 @@ var PushPopup = function(message, duplicate) {
             txt.val(message.messagePerLocale[selected] || '');
         }
 
-    }
+        if (isView) {
+            message.usedLocales = _.extend({}, message.locales);
+            fillLocales();
+
+            if (message.type === 'data') {
+                content.find('.field.msg').hide();
+            }
+        } else {
+            txt.on('blur', setUsedLocales);
+            // wait for device count download
+
+            // message.apps.forEach(function(appId){
+            //     var app = allApps[appId];
+
+            //     if (appId in locales) for (var locale in locales[appId]) {
+            //         if (!(locale in message.usedLocales)) message.usedLocales[locale] = 0;
+            //         message.usedLocales[locale] += locales[appId][locale];
+            //     }
+            // });
+            // for (var locale in message.usedLocales) message.usedLocales[locale] /= message.apps.length;
+        }
+    // }
 
     if (isView) {
         content.find('textarea').prop('disabled', true);
@@ -3754,15 +3938,15 @@ var PushPopup = function(message, duplicate) {
         if (message.test) content.find('.extra-test-check').attr('checked', 'checked');
         if (message.sound) {
             content.find('.extras .extra-sound-check').attr('checked', 'checked');
-            content.find('.extras .extra-sound').val(message.sound);
+            content.find('.extras .extra-sound').val(message.duplicate.sound);
         }
         if (message.badge) {
             content.find('.extras .extra-badge-check').attr('checked', 'checked');
-            content.find('.extras .extra-badge').val(message.badge);
+            content.find('.extras .extra-badge').val(message.duplicate.badge);
         }
         if (message.data) {
             content.find('.extras .extra-data-check').attr('checked', 'checked');
-            content.find('.extras .extra-data').val(JSON.stringify(message.data));
+            content.find('.extras .extra-data').val(JSON.stringify(message.duplicate.data));
         }
     }
 
@@ -3783,6 +3967,9 @@ var PushPopup = function(message, duplicate) {
                 $(this).prev().find('input[type="checkbox"]').trigger('click');
             }
         });
+        if (message.noTests) {
+            content.find('.test-switch-holder').hide();
+        }
         content.find('.extras table label, .test-switch-holder label').on('click', function(ev){
             var box = $(this).prev();
             if (box.is(':checkbox')) {
@@ -3859,13 +4046,13 @@ var PushPopup = function(message, duplicate) {
                     json.badge = 1 * json.badge;
                 }
             }
-            if (message.data && (!json.data || !toJSON(json.data))) {
+            if (message.data && !json.data) {
                 content.find(".extra-data").after(req.clone());
             }
             if (json.type === 'link' && (!json.url || ! /^([a-z]([a-z]|\d|\+|-|\.)*):(\/\/(((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?((\[(|(v[\da-f]{1,}\.(([a-z]|\d|-|\.|_|~)|[!\$&'\(\)\*\+,;=]|:)+))\])|((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=])*)(:\d*)?)(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*|(\/((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)){0})(\?((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|[\uE000-\uF8FF]|\/|\?)*)?(\#((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|\/|\?)*)?$/i.test(json.url) )) {
                 content.find(".field.link .details").after(req.clone());
             }
-            if ('default' in message.usedLocales && !json.messagePerLocale['default']) {
+            if ('default' in message.usedLocales && !json.messagePerLocale['default'] && json.type != 'data') {
                 content.find(".locales li").first().append(req.clone());
             }
 
@@ -3884,7 +4071,8 @@ var PushPopup = function(message, duplicate) {
                     // });
                     content.find('.btn-close').trigger('click');
                 }, function(error){
-                    content.find('.btn-close').trigger('click');
+                    butt.removeClass('disabled');
+                    CountlyHelpers.alert(error);
                     // butt.removeClass('disabled');
                     // Messenger({
                     //     extraClasses: 'messenger-fixed messenger-on-top messenger-on-right'
@@ -3904,10 +4092,16 @@ var PushPopup = function(message, duplicate) {
     });
 
     // Device count
-    {
-        var count, send;
+    // {
+        var count, send = content.find('.btn-send');
 
-        setDeviceCount();
+        function checkMessageForSendButton() {
+            if (typeof message.count === 'undefined' || !message.count.TOTALLY || ('default' in message.usedLocales && !message.messagePerLocale['default'] && message.type != 'data')) {
+                send.addClass('disabled');
+            } else {
+                send.removeClass('disabled');
+            }
+        }
 
         function setUsedLocales() {
             var txt = content.find('.msg textarea'),
@@ -3941,11 +4135,7 @@ var PushPopup = function(message, duplicate) {
                 txt.hide();
             }
 
-            if (!message.count.TOTALLY || ('default' in message.usedLocales && !message.messagePerLocale['default'])) {
-                send.addClass('disabled');
-            } else {
-                send.removeClass('disabled');
-            }
+            checkMessageForSendButton();
 
             fillLocales();
 
@@ -3955,11 +4145,10 @@ var PushPopup = function(message, duplicate) {
         function setDeviceCount(){
             if (!count) {
                 count = content.find('.count-value');
-                send = content.find('.btn-send');
             }
             count.text('');
             countlyPush.getAudience(
-                {apps: message.apps, platforms: message.platforms, test: message.test},
+                {apps: message.apps, platforms: message.platforms, test: message.test, conditions: message.conditions},
                 function(resp) {
                     message.count = resp;
 
@@ -3973,7 +4162,9 @@ var PushPopup = function(message, duplicate) {
                 }
             );
         }
-    }
+
+        setDeviceCount();
+   // }
 
     if (isView) {
         content.find('input, textarea').each(function(){
@@ -4096,16 +4287,21 @@ var PushPopup = function(message, duplicate) {
             update: message.type === 'update',
             review: message.type === 'review',
             url: message.type === 'link' ? content.find('.push-link').val() : '',
+            category: message.type === 'category' ? content.find('.push-category').val() : '',
             locales: message.usedLocales,
-            date: content.find('.send-later:checked').length ? content.find('.send-later-date').data('timestamp') : null
+            date: content.find('.send-later:checked').length ? content.find('.send-later-date').data('timestamp') : null,
+            conditions: message.conditions
         };
 
         if (json.sound === '') delete json.sound;
         if (json.badge === '') delete json.badge;
         if (json.data  === '') delete json.data;
         if (json.url  === '') delete json.url;
+        if (json.category  === '') delete json.category;
         if (!json.update) delete json.update;
         if (!json.review) delete json.review;
+        if (!json.conditions) delete json.conditions;
+        if (json.data) json.data = toJSON(json.data);
 
         for (var l in message.messagePerLocale) if (message.messagePerLocale[l]) {
             json.messagePerLocale[l] = message.messagePerLocale[l];

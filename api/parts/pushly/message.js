@@ -3,6 +3,7 @@
 var pushly = require('pushly')();
 
 var _ = require('underscore'),
+    flatten = require('flat'),
     common = require('./../../utils/common.js');
 
 var MessageStatus = _.extend({}, pushly.MessageStatus, {Deleted: 1 << 10});
@@ -47,6 +48,7 @@ module.exports.Message = function (apps, names) {
     if (_.isObject(apps) && !_.isArray(apps)) {
         _.extend(this, apps);
     } else {
+        this.type = undefined;
         this.apps = apps;
         this.appNames = names;
         this.status = MessageStatus.Initial;
@@ -56,8 +58,10 @@ module.exports.Message = function (apps, names) {
         this.messagePerLocale = undefined;      // Map of localized messages
         this.collapseKey = undefined;         	// Collapse key for Android
         this.contentAvailable = undefined;    	// content-available for iOS
-        this.newsstandAvailable = undefined;  	// newsstand-available for iOS
-        this.url = undefined;                  	// url to open
+        this.newsstandAvailable = undefined;    // newsstand-available for iOS
+        this.delayWhileIdle = undefined;  	    // delay_while_idle for Android
+        this.url = undefined;                   // url to open
+        this.category = undefined;              // message category (iOS 8+)
         this.review = undefined;               	// call-to-review app (app ID should be here)
         this.update = undefined;               	// call-to-review app (app ID should be here)
         this.data = undefined;                  // Custom data
@@ -113,9 +117,21 @@ module.exports.Message = function (apps, names) {
                 return this;
             }
         },
+        setDelayWhileIdle: {
+            value: function (delay) {
+                this.delayWhileIdle = delay;
+                return this;
+            }
+        },
         setURL: {
             value: function (url) {
                 this.url = url;
+                return this;
+            }
+        },
+        setCategory: {
+            value: function (category) {
+                this.category = category;
                 return this;
             }
         },
@@ -193,7 +209,7 @@ module.exports.Message = function (apps, names) {
         },
         setData: {
             value: function (obj) {
-                this.data = obj;
+                this.data = flatten.unflatten(obj);
                 return this;
             }
         },
@@ -222,7 +238,6 @@ module.exports.Message = function (apps, names) {
                 var content = {
                     data: {
                         c: {
-                            i: this._id + ''
                         }
                     }
                 };
@@ -235,8 +250,16 @@ module.exports.Message = function (apps, names) {
                     content.messagePerLocale = this.messagePerLocale;
                 }
 
+                if (!this.message && !this.messagePerLocale) {
+                    content.contentAvailable = true;
+                }
+
                 if (this.collapseKey) {
                     content.collapseKey = this.collapseKey;
+                }
+
+                if (this.delayWhileIdle) {
+                    content.delayWhileIdle = this.delayWhileIdle;
                 }
 
                 if (this.contentAvailable) {
@@ -261,14 +284,25 @@ module.exports.Message = function (apps, names) {
 
                 if (this.url) {
                     content.data.c.l = this.url;
+                    content.category = '[CLY]_url';
                 }
 
-                if (this.update) {
+                if (this.category) {
+                    content.category = this.category;
+                }
+
+                if (typeof this.update != 'undefined') {
                     content.data.c.u = this.update;
+                    content.category = '[CLY]_update';
                 }
 
-                if (this.review) {
+                if (typeof this.review != 'undefined') {
                     content.data.c.r = this.review;
+                    content.category = '[CLY]_review';
+                }
+
+                if (this.data) {
+                     _.extend(content.data, this.data);
                 }
 
                 var idComponents = [this._id + ''];
@@ -278,6 +312,8 @@ module.exports.Message = function (apps, names) {
                 } else {
                 	idComponents.push(credentials.platform);
                 }
+
+                content.data.c.i = this._id + '';
 
                 var m = {
                     id: idComponents.join('|'),
