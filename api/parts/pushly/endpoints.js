@@ -515,7 +515,7 @@ var pushly 			= require('pushly')(),
         }
 
         for (var platform in msg.platforms) if ([Platform.APNS, Platform.GCM].indexOf(msg.platforms[platform]) === -1) {
-            common.returnOutput(params, {error: 'Bad message plaform "' + msg.platforms[plaform] + '", only "' + Platform.APNS + '" (APNS) and "' + Platform.GCM + '" (GCM) are supported'});
+            common.returnOutput(params, {error: 'Bad message plaform "' + msg.platforms[platform] + '", only "' + Platform.APNS + '" (APNS) and "' + Platform.GCM + '" (GCM) are supported'});
             return false;
         }
 
